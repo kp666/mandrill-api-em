@@ -30,12 +30,26 @@ module Mandrill
         end
 
         def call(url, params={})
-            params[:key] = @apikey
-            params = JSON.generate(params)
+          params[:key] = @apikey
+          params = JSON.generate(params)
+          if block_given?
+            em_http = EventMachine::HttpRequest.new(@host)
+            result = em_http.post(:path => "#{@path}#{url}.json", :headers => {'Content-Type' => 'application/json'}, :body => params)
+            result.callback {
+              status = result.response_header.http_status
+              if status != 200
+                cast_error(result.response)
+              end
+              parsed_response = JSON.parse result.response
+              yield parsed_response
+
+            }
+          else
             r = @session.post(:path => "#{@path}#{url}.json", :headers => {'Content-Type' => 'application/json'}, :body => params)
-            
             cast_error(r.body) if r.status != 200
             return JSON.parse(r.body)
+          end
+
         end
 
         def read_configs()
